@@ -3,6 +3,7 @@ package vochain
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
@@ -178,7 +179,7 @@ func testSetProcessStatus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 
 	tx := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_STATUS,
-		Nonce:     util.RandomBytes(32),
+		Nonce:     uint32(time.Now().Unix()),
 		ProcessId: pid,
 		Status:    status,
 	}
@@ -326,7 +327,7 @@ func testSetProcessResults(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 
 	tx := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_RESULTS,
-		Nonce:     util.RandomBytes(32),
+		Nonce:     uint32(time.Now().Unix()),
 		ProcessId: pid,
 		Results:   results,
 	}
@@ -454,7 +455,7 @@ func testSetProcessCensus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 
 	tx := &models.SetProcessTx{
 		Txtype:     models.TxType_SET_PROCESS_CENSUS,
-		Nonce:      util.RandomBytes(32),
+		Nonce:      uint32(time.Now().Unix()),
 		ProcessId:  pid,
 		CensusRoot: censusRoot,
 		CensusURI:  censusURI,

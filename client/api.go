@@ -556,7 +556,7 @@ func (c *Client) TestPreRegisterKeys(
 		s := signers[i]
 		zkCensusKey, _ := testGetZKCensusKey(s)
 		v := &models.RegisterKeyTx{
-			Nonce:     util.RandomBytes(32),
+			Nonce:     uint32(time.Now().Unix()),
 			ProcessId: pid,
 			NewKey:    zkCensusKey,
 			Weight:    registerKeyWeight,
@@ -1092,7 +1092,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 	}
 	p := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,
-		Nonce:   util.RandomBytes(32),
+		Nonce:   uint32(time.Now().Unix()),
 		Process: processData,
 	}
 	var err error
@@ -1137,7 +1137,7 @@ func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
 		Txtype:    models.TxType_SET_PROCESS_STATUS,
 		ProcessId: pid,
 		Status:    &status,
-		Nonce:     util.RandomBytes(32),
+		Nonce:     uint32(time.Now().Unix()),
 	}
 	stx := &models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: p}})

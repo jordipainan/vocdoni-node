@@ -3,12 +3,12 @@ package oracle
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
@@ -79,7 +79,7 @@ func (o *Oracle) NewProcess(process *models.Process) error {
 	// Create, sign a send NewProcess transaction
 	processTx := &models.NewProcessTx{
 		Process: process,
-		Nonce:   util.RandomBytes(32),
+		Nonce:   uint32(time.Now().Unix()),
 		Txtype:  models.TxType_NEW_PROCESS,
 	}
 	var err error
@@ -144,7 +144,7 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexerty
 		Results:   scrutinizer.BuildProcessResult(results, vocProcessData.EntityId),
 		Status:    models.ProcessStatus_RESULTS.Enum(),
 		Txtype:    models.TxType_SET_PROCESS_RESULTS,
-		Nonce:     util.RandomBytes(32),
+		Nonce:     uint32(time.Now().Unix()),
 	}
 
 	// add the signature to the results and own address

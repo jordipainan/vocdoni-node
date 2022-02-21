@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/tendermint/tendermint/privval"
@@ -65,7 +66,7 @@ var (
 	HardcodedNewProcessTx = &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,
 		Process: ProcessHardcoded,
-		Nonce:   util.RandomBytes(32),
+		Nonce:   uint32(time.Now().Unix()),
 	}
 
 	HardcodedNewVoteTx = &models.VoteEnvelope{
@@ -81,26 +82,26 @@ var (
 	HardcodedAdminTxAddOracle = &models.AdminTx{
 		Txtype:  models.TxType_ADD_ORACLE,
 		Address: testutil.Hex2byte(nil, "39106af1fF18bD60a38a296fd81B1f28f315852B"), // oracle address or pubkey validator
-		Nonce:   util.RandomBytes(32),
+		Nonce:   uint32(time.Now().Unix()),
 	}
 
 	HardcodedAdminTxRemoveOracle = &models.AdminTx{
 		Txtype:  models.TxType_REMOVE_ORACLE,
 		Address: testutil.Hex2byte(nil, "00192Fb10dF37c9FB26829eb2CC623cd1BF599E8"),
-		Nonce:   util.RandomBytes(32),
+		Nonce:   uint32(time.Now().Unix()),
 	}
 	power                        = uint64(10)
 	HardcodedAdminTxAddValidator = &models.AdminTx{
 		Txtype:  models.TxType_ADD_VALIDATOR,
 		Address: testutil.Hex2byte(nil, "5DC922017285EC24415F3E7ECD045665EADA8B5A"),
-		Nonce:   util.RandomBytes(32),
+		Nonce:   uint32(time.Now().Unix()),
 		Power:   &power,
 	}
 
 	HardcodedAdminTxRemoveValidator = &models.AdminTx{
 		Txtype:  models.TxType_REMOVE_VALIDATOR,
 		Address: testutil.Hex2byte(nil, "5DC922017285EC24415F3E7ECD045665EADA8B5A"),
-		Nonce:   util.RandomBytes(32),
+		Nonce:   uint32(time.Now().Unix()),
 	}
 )
 

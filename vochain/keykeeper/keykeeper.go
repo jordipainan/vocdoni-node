@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/badgerdb"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -421,7 +421,7 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	tx := &models.AdminTx{
 		Txtype:              models.TxType_ADD_PROCESS_KEYS,
 		KeyIndex:            kindex,
-		Nonce:               util.RandomBytes(32),
+		Nonce:               uint32(time.Now().Unix()),
 		ProcessId:           []byte(pid),
 		EncryptionPublicKey: pk.pubKey,
 	}
@@ -458,7 +458,7 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 	tx := &models.AdminTx{
 		Txtype:               models.TxType_REVEAL_PROCESS_KEYS,
 		KeyIndex:             kindex,
-		Nonce:                util.RandomBytes(32),
+		Nonce:                uint32(time.Now().Unix()),
 		ProcessId:            []byte(pid),
 		EncryptionPrivateKey: pk.privKey,
 	}
