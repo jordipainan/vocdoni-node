@@ -111,7 +111,8 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 		}
 
 	case *models.Tx_NewProcess:
-		if p, err := app.NewProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State); err == nil {
+		// TODO: @jordipainan collect tx sender, substract cost and increment nonce
+		if _, p, err := app.NewProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State); err == nil {
 			if commit {
 				tx := vtx.Tx.GetNewProcess()
 				if tx.Process == nil {
@@ -124,7 +125,9 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 		}
 
 	case *models.Tx_SetProcess:
-		if err := SetProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State); err != nil {
+		// TODO: @jordipainan collect tx sender, substract cost and increment nonce
+		_, err := SetProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		if err != nil {
 			return []byte{}, fmt.Errorf("setProcess: %w", err)
 		}
 		if commit {
@@ -276,7 +279,6 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			default:
 				return []byte{}, fmt.Errorf("setAccountDelegate: invalid transaction type")
 			}
-			// substract tx costs and increment nonce
 			return vtx.TxID[:], err
 		}
 	default:

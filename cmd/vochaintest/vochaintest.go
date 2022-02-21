@@ -105,6 +105,33 @@ func main() {
 		}
 	}
 
+	oracleKey := ethereum.NewSignKeys()
+	if len(*oraclePrivKey) > 0 {
+		if err := oracleKey.AddHexKey(*oraclePrivKey); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		if err := oracleKey.Generate(); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	treasurerKey := ethereum.NewSignKeys()
+	if len(*treasurerPrivKey) > 0 {
+		if err := treasurerKey.AddHexKey(*treasurerPrivKey); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		if err := treasurerKey.Generate(); err != nil {
+			log.Fatal(err)
+		}
+	}
+	// set accounts
+	// oracle is also the treasurer
+	if err := setInitAccounts(treasurerKey, oracleKey, entityKey, *host); err != nil {
+		log.Fatalf("cannot set accounts: %w", err)
+	}
+
 	switch *opmode {
 	case "anonvoting":
 		mkTreeAnonVoteTest(*host,
@@ -235,6 +262,84 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 		log.Fatal(err)
 	}
 	log.Infof("Census created and published\nRoot: %s\nURI: %s", root, uri)
+}
+
+func setInitAccounts(treasurer, oracle, mainSigner *ethereum.SignKeys, host string) error {
+	var err error
+	log.Infof("connecting to main gateway %s", host)
+	// connecting to endpoint
+	var mainClient *client.Client
+	for tries := 10; tries > 0; tries-- {
+		mainClient, err = client.New(host)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer mainClient.Close()
+	// get the chain ID for signing the transactions
+	chainId, err := mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// set chain id
+	treasurer.VocdoniChainID = chainId
+	oracle.VocdoniChainID = chainId
+	mainSigner.VocdoniChainID = chainId
+
+	// wait until mined
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	mainClient.WaitUntilBlock(h + 2)
+	// create accounts
+	if err := mainClient.CreateOrSetAccount(oracle, common.Address{}, "ipfs://", 0, nil); err != nil {
+		log.Fatalf("cannot create account %s: %s", oracle.Address(), err)
+	}
+	// wait until mined
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	mainClient.WaitUntilBlock(h + 2)
+	if err := mainClient.CreateOrSetAccount(mainSigner, common.Address{}, "ipfs://", 0, nil); err != nil {
+		log.Fatalf("cannot create account %s: %s", mainSigner.Address(), err)
+	}
+	// wait until mined
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	mainClient.WaitUntilBlock(h + 2)
+
+	// top up accounts
+	treasurerAccount, err := mainClient.GetTreasurer(treasurer)
+	if err != nil {
+		log.Fatalf("cannot get treasurer: %w", err)
+	}
+	if err := mainClient.MintTokens(treasurer, oracle.Address(), 0, 10000); err != nil {
+		log.Fatalf("cannot mint tokens for account %s with treasurer %+v, error: %w", oracle.Address(), treasurerAccount, err)
+	}
+	// wait until mined
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	mainClient.WaitUntilBlock(h + 2)
+	if err := mainClient.MintTokens(treasurer, mainSigner.Address(), 1, 10000); err != nil {
+		log.Fatalf("cannot mint tokens for account %s with treasurer %+v, error: %w", mainSigner.Address(), treasurerAccount, err)
+	}
+	// wait until mined
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	mainClient.WaitUntilBlock(h + 2)
+	return nil
 }
 
 func mkTreeVoteTest(host,

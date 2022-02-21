@@ -189,6 +189,12 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 	if !oracleExist {
 		log.Warnf("adding new oracle key %s", oracleKey.Address())
 		vc.app.State.AddOracle(oracleKey.Address())
+		// create account with some balance
+		acc := &vochain.Account{}
+		acc.Balance = 10000
+		if err := vc.app.State.SetAccount(oracleKey.Address(), acc); err != nil {
+			log.Fatal(err)
+		}
 		if _, err := vc.app.State.Save(); err != nil {
 			return err
 		}

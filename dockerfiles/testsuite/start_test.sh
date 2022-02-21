@@ -14,10 +14,10 @@ CLEAN=${CLEAN:-1}
 LOGLEVEL=${LOGLEVEL:-info}
 GWHOST="http://gateway0:9090/dvote"
 . env.oracle0key # contains var DVOTE_ETHCONFIG_SIGNINGKEY, import into current env
-ORACLE_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
-[ -n "$TESTSUITE_ORACLE_KEY" ] && ORACLE_KEY="$TESTSUITE_ORACLE_KEY"
 TREASURER_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
 [ -n "$TESTSUITE_TREASURER_KEY" ] && TREASURER_KEY="$TESTSUITE_TREASURER_KEY"
+MAINSIGNER_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
+[ -n "$TESTSUITE_MAINSIGNER_KEY" ] && MAINSIGNER_KEY="$TESTSUITE_MAINSIGNER_KEY"
 
 ### if you want to add a new test:
 ### add "newtest" to tests_to_run array (as well as a comment at the head of the file)
@@ -40,7 +40,9 @@ merkle_vote() {
 		./vochaintest --gwHost $GWHOST \
 		--logLevel=$LOGLEVEL \
 		--operation=vtest \
-		--oracleKey=$ORACLE_KEY \
+		--treasurerKey=$TREASURER_KEY \
+		--entityKey=$MAINSIGNER_KEY \
+		--oracleKey=$ORACLE_KEY
 		--electionSize=$ELECTION_SIZE \
 		--electionType=$1 \
 		--withWeight=2
@@ -59,7 +61,9 @@ anonvoting() {
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=anonvoting \
-		  --oracleKey=$ORACLE_KEY \
+		  --treasurerKey=$TREASURER_KEY \
+		  --entityKey=$MAINSIGNER_KEY \
+		  --oracleKey=$ORACLE_KEY
 		  --electionSize=$ELECTION_SIZE_ANON
 }
 
@@ -68,7 +72,9 @@ cspvoting() {
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=cspvoting \
-		  --oracleKey=$ORACLE_KEY \
+		  --treasurerKey=$TREASURER_KEY \
+		  --entityKey=$MAINSIGNER_KEY \
+		  --oracleKey=$ORACLE_KEY
 		  --electionSize=$ELECTION_SIZE
 }
 
@@ -77,7 +83,9 @@ tokentransactions() {
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=tokentransactions \
-		  --treasurerKey=$TREASURER_KEY
+		  --treasurerKey=$TREASURER_KEY \
+		  --entityKey=$MAINSIGNER_KEY \
+		  --oracleKey=$ORACLE_KEY
 }
 
 ### end tests definition

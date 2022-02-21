@@ -27,6 +27,11 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	oracleAcc := &Account{}
+	oracleAcc.Balance = 10000
+	if err := app.State.SetAccount(oracle.Address(), oracleAcc); err != nil {
+		t.Fatal(err)
+	}
 	// Add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
@@ -37,7 +42,7 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		Mode:         &models.ProcessMode{Interruptible: true},
 		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     oracle.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -87,7 +92,7 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true},
 		Status:       models.ProcessStatus_PAUSED,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     oracle.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -137,7 +142,7 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: false, AutoStart: false},
 		Status:       models.ProcessStatus_PAUSED,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     oracle.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -219,10 +224,19 @@ func TestProcessSetResultsTransition(t *testing.T) {
 	if err := oracle2.Generate(); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.State.AddOracle(common.HexToAddress(oracle.AddressString())); err != nil {
+	if err := app.State.AddOracle(oracle.Address()); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.State.AddOracle(common.HexToAddress(oracle2.AddressString())); err != nil {
+	if err := app.State.AddOracle(oracle2.Address()); err != nil {
+		t.Fatal(err)
+	}
+
+	oracleAcc := &Account{}
+	oracleAcc.Balance = 10000
+	if err := app.State.SetAccount(oracle.Address(), oracleAcc); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.State.SetAccount(oracle2.Address(), oracleAcc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -235,7 +249,7 @@ func TestProcessSetResultsTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     oracle.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -289,7 +303,7 @@ func TestProcessSetResultsTransition(t *testing.T) {
 
 	// set results should work if process ended
 	if err := testSetProcessResults(t, pid, &oracle, app, results); err != nil {
-		t.Fatal("adding results while process ended should work")
+		t.Fatalf("adding results while process ended should work: %v", err)
 	}
 
 	// status results already added by the previous tx
@@ -363,7 +377,13 @@ func TestProcessSetCensusTransition(t *testing.T) {
 	if err := oracle.Generate(); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.State.AddOracle(common.HexToAddress(oracle.AddressString())); err != nil {
+	if err := app.State.AddOracle(oracle.Address()); err != nil {
+		t.Fatal(err)
+	}
+
+	oracleAcc := &Account{}
+	oracleAcc.Balance = 10000
+	if err := app.State.SetAccount(oracle.Address(), oracleAcc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -379,7 +399,7 @@ func TestProcessSetCensusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true, DynamicCensus: true},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     oracle.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -392,7 +412,7 @@ func TestProcessSetCensusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     oracle.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI2,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -405,7 +425,7 @@ func TestProcessSetCensusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true, DynamicCensus: true},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     oracle.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI2,
 		CensusOrigin: models.CensusOrigin_ERC20,

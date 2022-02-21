@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
@@ -380,71 +381,89 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
 func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
-	signature []byte, state *State) (*models.Process, error) {
+	signature []byte, state *State) (common.Address, *models.Process, error) {
+	if vtx == nil {
+		return common.Address{}, nil, ErrNilTx
+	}
 	tx := vtx.GetNewProcess()
 	if tx.Process == nil {
-		return nil, fmt.Errorf("process data is empty")
+		return common.Address{}, nil, fmt.Errorf("process data is empty")
+	}
+	// check signature available and txBytes are set
+	if signature == nil || txBytes == nil {
+		return common.Address{}, nil, fmt.Errorf("missing signature or new process transaction")
 	}
 	// basic required fields check
 	if tx.Process.VoteOptions == nil || tx.Process.EnvelopeType == nil || tx.Process.Mode == nil {
-		return nil, fmt.Errorf("missing required fields (voteOptions, envelopeType or processMode)")
+		return common.Address{}, nil, fmt.Errorf("missing required fields (voteOptions, envelopeType or processMode)")
 	}
 	if tx.Process.VoteOptions.MaxCount == 0 || tx.Process.VoteOptions.MaxValue == 0 {
-		return nil, fmt.Errorf("missing vote options parameters (maxCount or maxValue)")
+		return common.Address{}, nil, fmt.Errorf("missing vote options parameters (maxCount or maxValue)")
 	}
-	// check signature available
-	if signature == nil || tx == nil || txBytes == nil {
-		return nil, fmt.Errorf("missing signature or new process transaction")
+	// check entityId
+	if tx.Process.EntityId == nil {
+		return common.Address{}, nil, fmt.Errorf("entityId not set")
+	}
+	if bytes.Equal(tx.Process.EntityId, types.EthereumZeroAddress.Bytes()) ||
+		len(tx.Process.EntityId) != types.EntityIDsize {
+		return common.Address{}, nil, fmt.Errorf("invalid entityId")
 	}
 	// start and block count sanity check
 	// if startBlock is zero or one, the process will be enabled on the next block
 	if tx.Process.StartBlock == 0 || tx.Process.StartBlock == 1 {
 		tx.Process.StartBlock = state.CurrentHeight() + 1
 	} else if tx.Process.StartBlock < state.CurrentHeight() {
-		return nil, fmt.Errorf(
+		return common.Address{}, nil, fmt.Errorf(
 			"cannot add process with start block lower than or equal to the current height")
 	}
 	if tx.Process.BlockCount <= 0 {
-		return nil, fmt.Errorf(
+		return common.Address{}, nil, fmt.Errorf(
 			"cannot add process with duration lower than or equal to the current height")
 	}
-	// Check if transaction owner has enough funds to create a process
-	authorized, addr, err := state.VerifyAccountBalance(txBytes, signature, NewProcessCost)
+	// recover address from signature
+	signer, _, err := state.AccountFromSignature(txBytes, signature)
 	if err != nil {
-		return nil, err
+		return common.Address{}, nil, err
 	}
-	if authorized {
-		// If owner authorized, check entityId matches with owner address
-		if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) {
-			return nil, fmt.Errorf("process entityID and transaction owner do not match")
+	// TODO: @jordipainan check tx cost and nonce
+	// entityId != signerAcc
+	eidAddress := common.BytesToAddress(tx.Process.EntityId)
+	if eidAddress != *signer {
+		entityIdAcc, err := state.GetAccount(common.BytesToAddress(tx.Process.EntityId), false)
+		if err != nil {
+			return common.Address{}, nil, fmt.Errorf("cannot get account: %w", err)
 		}
-	} else {
-		// Check if the transaction comes from an oracle
-		// Oracles can create processes with any entityID
-		if authorized, err = state.IsOracle(addr); err != nil {
-			return nil, err
+		if entityIdAcc == nil {
+			return common.Address{}, nil, ErrAccountNotExist
 		}
-	}
-	// If owner without balance and not an oracle, fail
-	if !authorized {
-		return nil, fmt.Errorf("unauthorized to create a process, recovered addr is %s", addr.Hex())
+		// check if signer is delegate of entityId
+		if !entityIdAcc.IsDelegate(*signer) {
+			// if not delegate check if is oracle address
+			isOracle, err := state.IsOracle(*signer)
+			if err != nil {
+				return common.Address{}, nil, fmt.Errorf("cannot check if signer is oracle: %w", err)
+			}
+			if !isOracle {
+				return common.Address{}, nil, fmt.Errorf("unauthorized to create a process, recovered addr is %s", *signer)
+			}
+		}
 	}
 	// get process
 	_, err = state.Process(tx.Process.ProcessId, false)
 	if err == nil {
-		return nil, fmt.Errorf("process with id (%x) already exists", tx.Process.ProcessId)
+		return common.Address{}, nil, fmt.Errorf("process with id (%x) already exists", tx.Process.ProcessId)
 	}
 
 	// check valid/implemented process types
 	// pre-regiser and anonymous must be either both enabled or disabled, as
 	// we only support a single scenario of pre-register + anonymous.
 	if tx.Process.Mode.PreRegister != tx.Process.EnvelopeType.Anonymous {
-		return nil, fmt.Errorf("pre-register mode only supported " +
+		return common.Address{}, nil, fmt.Errorf("pre-register mode only supported " +
 			"with anonymous envelope type and viceversa")
 	}
 	if tx.Process.Mode.PreRegister &&
 		(tx.Process.MaxCensusSize == nil || *tx.Process.MaxCensusSize <= 0) {
-		return nil, fmt.Errorf("pre-register mode requires setting " +
+		return common.Address{}, nil, fmt.Errorf("pre-register mode requires setting " +
 			"maxCensusSize to be > 0")
 	}
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
@@ -456,13 +475,13 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 			circuits = Genesis["dev"].CircuitsConfig
 		}
 		if len(circuits) == 0 {
-			return nil, fmt.Errorf("no circuit configs in the %v genesis", app.chainId)
+			return common.Address{}, nil, fmt.Errorf("no circuit configs in the %v genesis", app.chainId)
 		}
 		if tx.Process.MaxCensusSize == nil {
-			return nil, fmt.Errorf("maxCensusSize is not provided")
+			return common.Address{}, nil, fmt.Errorf("maxCensusSize is not provided")
 		}
 		if *tx.Process.MaxCensusSize > uint64(circuits[len(circuits)-1].Parameters[0]) {
-			return nil, fmt.Errorf("maxCensusSize for anonymous envelope "+
+			return common.Address{}, nil, fmt.Errorf("maxCensusSize for anonymous envelope "+
 				"cannot be bigger than the parameter for the biggest circuit (%v)",
 				circuits[len(circuits)-1].Parameters[0])
 		}
@@ -472,7 +491,7 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	// all the required changes to support a process with a rolling census
 	// that is not Anonymous.
 	if tx.Process.EnvelopeType.Serial {
-		return nil, fmt.Errorf("serial process not yet implemented")
+		return common.Address{}, nil, fmt.Errorf("serial process not yet implemented")
 	}
 
 	if tx.Process.EnvelopeType.EncryptedVotes || tx.Process.EnvelopeType.Anonymous {
@@ -480,60 +499,67 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 		tx.Process.EncryptionPublicKeys = make([]string, types.KeyKeeperMaxKeyIndex)
 		tx.Process.EncryptionPrivateKeys = make([]string, types.KeyKeeperMaxKeyIndex)
 	}
-	return tx.Process, nil
+	return *signer, tx.Process, nil
 }
 
 // SetProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
-func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
+func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, error) {
+	if vtx == nil {
+		return common.Address{}, ErrNilTx
+	}
 	tx := vtx.GetSetProcess()
 	// check signature available
-	if signature == nil || tx == nil || txBytes == nil {
-		return fmt.Errorf("missing signature on setProcess transaction")
+	if signature == nil || txBytes == nil {
+		return common.Address{}, fmt.Errorf("missing signature or txBytes on setProcess transaction")
 	}
 
-	// Check if transaction owner has enough funds to create a process
-	authorized, addr, err := state.VerifyAccountBalance(txBytes, signature, SetProcessCost)
+	// recover address from signature
+	signer, _, err := state.AccountFromSignature(txBytes, signature)
 	if err != nil {
-		return err
+		return common.Address{}, err
 	}
+	// TODO: @jordipainan check tx cost and nonce
 	// get process
 	process, err := state.Process(tx.ProcessId, false)
 	if err != nil {
-		return fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
+		return common.Address{}, fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
 	}
-	isOracle := false
-	if authorized {
-		// If owner authorized, check entityId matches with owner address
-		if !bytes.Equal(process.EntityId, addr.Bytes()) {
-			return fmt.Errorf("process entityID and transaction owner do not match")
-		}
-	} else {
-		// Check if the transaction comes from an oracle
-		// Oracles can create processes with any entityID
-		if isOracle, err = state.IsOracle(addr); err != nil {
-			return err
-		}
+	// check if oracle
+	isOracle, err := state.IsOracle(*signer)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("cannot check if signer is oracle: %w", err)
 	}
-
-	// If owner without balance and not an oracle, fail
-	if !authorized && !isOracle {
-		return fmt.Errorf("unauthorized to set process status, recovered addr is %s", addr.Hex())
+	// entityId != signerAcc
+	eidAddress := common.BytesToAddress(process.EntityId)
+	if eidAddress != *signer && !isOracle {
+		entityIdAcc, err := state.GetAccount(common.BytesToAddress(process.EntityId), false)
+		if err != nil {
+			return common.Address{}, fmt.Errorf("cannot get account: %w", err)
+		}
+		if entityIdAcc == nil {
+			return common.Address{}, ErrAccountNotExist
+		}
+		// check if signer is delegate of entityId
+		if !entityIdAcc.IsDelegate(*signer) {
+			// if not delegate check if is oracle address
+			return common.Address{}, fmt.Errorf("unauthorized to set process, recovered addr is %s", *signer)
+		}
 	}
 	switch tx.Txtype {
 	case models.TxType_SET_PROCESS_RESULTS:
 		if !isOracle {
-			return fmt.Errorf("only oracles can execute set process results transaction")
+			return common.Address{}, fmt.Errorf("only oracles can execute set process results transaction")
 		}
 		results := tx.GetResults()
-		if !bytes.Equal(results.OracleAddress, addr.Bytes()) {
-			return fmt.Errorf("cannot set results, oracle address provided in results does not match")
+		if !bytes.Equal(results.OracleAddress, signer.Bytes()) {
+			return common.Address{}, fmt.Errorf("cannot set results, oracle address provided in results does not match")
 		}
-		return state.SetProcessResults(process.ProcessId, results, false)
+		return *signer, state.SetProcessResults(process.ProcessId, results, false)
 	case models.TxType_SET_PROCESS_STATUS:
-		return state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
+		return *signer, state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
 	case models.TxType_SET_PROCESS_CENSUS:
-		return state.SetProcessCensus(process.ProcessId, tx.GetCensusRoot(), tx.GetCensusURI(), false)
+		return *signer, state.SetProcessCensus(process.ProcessId, tx.GetCensusRoot(), tx.GetCensusURI(), false)
 	default:
-		return fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)
+		return common.Address{}, fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)
 	}
 }

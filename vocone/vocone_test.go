@@ -42,7 +42,7 @@ func testCSPvote(oracle *ethereum.SignKeys, url string) error {
 	}
 	cspKey := ethereum.SignKeys{}
 	cspKey.Generate()
-	entityID := util.RandomBytes(20)
+	entityID := oracle.Address().Bytes()
 	censusRoot := cspKey.PublicKey()
 	processID := util.RandomBytes(32)
 	envelope := new(models.EnvelopeType)
